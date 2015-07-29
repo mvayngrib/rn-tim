@@ -8,14 +8,40 @@ require('./shim')
 
 var React = require('react-native');
 var Tim = require('tim')
+var Identity = require('midentity').Identity
+var tedPub = require('./test/fixtures/ted-pub.json')
+var tedPriv = require('./test/fixtures/ted-priv.json')
+var leveldown = require('asyncstorage-down')
 // var Keeper = require('bitkeeper-js')
-// var Wallet = require('simple-wallet')
-// var DHT = require('bittorrent-dht')
+var Wallet = require('simple-wallet')
+var help = require('tradle-test-helpers')
+var fakeKeeper = help.fakeKeeper
+var fakeWallet = help.fakeWallet
+var DHT = require('bittorrent-dht')
 
-// var DHT = require('bittorrent-dht')
-// var dht = new DHT()
-// dht.listen(12345)
-// dht.on('node', console.log.bind(console))
+var networkName = 'testnet'
+var tedIdent = Identity.fromJSON(tedPub)
+var tedWallet = walletFor(tedPriv, null, 'messaging')
+var dht = dhtFor(tedIdent)
+var ted = new Tim({
+  pathPrefix: 'ted',
+  leveldown: leveldown,
+  // syncInterval: 1000,
+  networkName: networkName,
+  blockchain: tedWallet.blockchain,
+  dht: dht,
+  // keeper: new Keeper({
+  //   dht: dht
+  // }),
+  keeper: fakeKeeper.empty(),
+  wallet: tedWallet,
+  identity: tedIdent,
+  identityKeys: tedPriv,
+  port: 12345
+})
+
+ted.once('ready', console.log.bind(console, 'ready'))
+
 var {
   AppRegistry,
   StyleSheet,
@@ -24,6 +50,8 @@ var {
 } = React;
 
 var rnnode = React.createClass({
+  // componentWillMount: function () {
+  // }
   render: function() {
     return (
       <View style={styles.container}>
@@ -62,3 +90,37 @@ var styles = StyleSheet.create({
 });
 
 AppRegistry.registerComponent('rnnode', () => rnnode);
+
+function dhtFor (identity) {
+  return new DHT({
+    nodeId: nodeIdFor(identity),
+    bootstrap: false
+    // ,
+    // bootstrap: ['tradle.io:25778']
+  })
+}
+
+function nodeIdFor (identity) {
+  var buf = new Buffer(identity.keys({ type: 'dsa' })[0].fingerprint(), 'base64')
+  return buf.slice(0, 20)
+  // return crypto.createHash('sha256')
+  //   .update(identity.keys({ type: 'dsa' })[0].fingerprint())
+  //   .digest()
+  //   .slice(0, 20)
+}
+
+function walletFor (keys, blockchain, purpose) {
+  return fakeWallet({
+    blockchain: blockchain,
+    unspents: [100000, 100000, 100000, 100000],
+    priv: find(keys, function (k) {
+      return k.type === 'bitcoin' &&
+        k.networkName === networkName &&
+        k.purpose === purpose
+    }).priv
+  })
+}
+
+function rethrow (err) {
+  if (err) throw err
+}
