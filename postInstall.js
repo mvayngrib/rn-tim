@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
 var fs = require('fs')
-var spawn = require('child_process').spawn
+var path = require('path')
+var semver = require('semver')
+var proc = require('child_process')
 var extend = require('xtend')
 var find = require('findit')
+var shims = require('./shims.json')
 var browser = require('./browser.json')
 var pkg = require('./package.json')
 
@@ -11,12 +14,24 @@ installShims()
 hackPackageJSONs()
 
 function installShims () {
-  for (var p in browser) {
-    if (pkg.dependencies[p] !== browser[p]) {
-      spawn('npm install', ['--save'], [p + '@' + browser[p]], { stdio: 'inherit' })
-      break
-    }
-  }
+  Object.keys(shims).forEach(function (name) {
+    var modPath = path.resolve('./node_modules/' + name)
+    fs.exists(modPath, function (exists) {
+      if (exists) {
+        var existingVer = require(modPath + '/package.json').version
+        if (semver.satisfies(existingVer, shims[name])) {
+          console.log('not reinstalling ' + name)
+          return
+        }
+      }
+
+      proc.execSync('npm install --save ' + name + '@' + shims[name], {
+        cwd: __dirname,
+        env: process.env,
+        stdio: 'inherit'
+      })
+    })
+  })
 }
 
 function hackPackageJSONs () {
@@ -36,33 +51,40 @@ function hackPackageJSONs () {
         return
       }
 
-      if (typeof pkgJson.browser === 'string') {
-        pkgJson[pkgJson]
-      }
+      // if (shims[pkgJson.name]) {
+      //   console.log('skipping', pkgJson.name)
+      //   return
+      // }
+
+      // if (pkgJson.name === 'readable-stream') debugger
 
       var orgBrowser = pkgJson.browser
-      var depBrowser
-      if (typeof pkgJson.browser === 'string') {
-        depBrowser = { main: pkgJson.browser }
+      var depBrowser = extend(browser)
+      var save
+      if (typeof orgBrowser === 'string') {
+        depBrowser[pkgJson.main] = pkgJson.browser
+        save = true
       } else {
-        depBrowser = extend({}, browser)
+        if (typeof orgBrowser === 'object') {
+          depBrowser = extend(depBrowser, orgBrowser)
+        } else {
+          save = true
+        }
       }
 
-      var save
-      if (orgBrowser) {
+      if (!save) {
         for (var p in depBrowser) {
-          if (orgBrowser[p] !== depBrowser[p]) {
+          if (!orgBrowser[p]) {
             save = true
-            break
+          } else if (depBrowser[p] !== browser[p]) {
+            console.log('not overwriting mapping', p, orgBrowser[p])
           }
         }
-      } else {
-        save = true
       }
 
       if (save) {
         pkgJson.browser = depBrowser
-        fs.writeFile(file, JSON.stringify(pkgJson), rethrow)
+        fs.writeFile(file, JSON.stringify(pkgJson, null, 2), rethrow)
       }
     })
   })
