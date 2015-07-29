@@ -9,17 +9,18 @@ require('./shim')
 var React = require('react-native');
 var Tim = require('tim')
 var Identity = require('midentity').Identity
-var tedPub = require('./test/fixtures/ted-pub.json')
-var tedPriv = require('./test/fixtures/ted-priv.json')
 var leveldown = require('asyncstorage-down')
-// var Keeper = require('bitkeeper-js')
+var Keeper = require('bitkeeper-js')
 var Wallet = require('simple-wallet')
 var help = require('tradle-test-helpers')
-var fakeKeeper = help.fakeKeeper
+// var fakeKeeper = help.fakeKeeper
 var fakeWallet = help.fakeWallet
 var DHT = require('bittorrent-dht')
 
+
 var networkName = 'testnet'
+var tedPub = require('./test/fixtures/ted-pub.json')
+var tedPriv = require('./test/fixtures/ted-priv.json')
 var tedIdent = Identity.fromJSON(tedPub)
 var tedWallet = walletFor(tedPriv, null, 'messaging')
 var dht = dhtFor(tedIdent)
@@ -30,10 +31,10 @@ var ted = new Tim({
   networkName: networkName,
   blockchain: tedWallet.blockchain,
   dht: dht,
-  // keeper: new Keeper({
-  //   dht: dht
-  // }),
-  keeper: fakeKeeper.empty(),
+  keeper: new Keeper({
+    dht: dht
+  }),
+  // keeper: fakeKeeper.empty(),
   wallet: tedWallet,
   identity: tedIdent,
   identityKeys: tedPriv,

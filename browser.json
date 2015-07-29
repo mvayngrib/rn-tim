@@ -4,6 +4,7 @@
   "constants": "constants-browserify",
   "crypto": "crypto-browserify",
   "dns": "dns.js",
+  "net": "utp",
   "domain": "domain-browser",
   "http": "http-browserify",
   "https": "https-browserify",

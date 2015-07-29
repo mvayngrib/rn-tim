@@ -9,6 +9,7 @@
   "dependencies": {
     "assert": "^1.3.0",
     "asyncstorage-down": "^1.0.0",
+    "bitkeeper-js": "tradle/bitkeeper-js",
     "bittorrent-dht": "tradle/bittorrent-dht",
     "browserify-zlib": "^0.1.4",
     "buffer": "^3.3.1",

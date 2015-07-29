@@ -30,17 +30,19 @@ var raisedOtrPath = path.resolve('./node_modules/otr')
 // loadDeps(hackFiles)
 
 var hackers = [
-  // {
-  //   name: 'fssync',
-  //   regex: [
-  //     /webtorrent\/lib\/fs-storage\.js/
-  //   ],
-  //   hack: function(file, contents) {
-  //     contents = contents.toString()
-  //     var fixed = contents.replace(/fs\.existsSync\([^\)]*\)/g, 'false')
-  //     return contents === fixed ? null : fixed
-  //   }
-  // },
+  // don't need this as soon as react native
+  // stops ignoring webtorrent/package.json "browser": "./lib/fs-storage.js": false
+  {
+    name: 'fssync',
+    regex: [
+      /webtorrent\/lib\/fs-storage\.js/
+    ],
+    hack: function(file, contents) {
+      contents = contents.toString()
+      var fixed = contents.replace(/fs\.existsSync\([^\)]*\)/g, 'false')
+      return contents === fixed ? null : fixed
+    }
+  },
   {
     name: 'bufferequal',
     regex: [/rudp\/lib\/bufferEqual\.js/],
@@ -94,6 +96,36 @@ var hackers = [
         }
 
         if (fixed) return JSON.stringify(pkg, null, 2)
+      }
+    }
+  },
+  {
+    name: 'webtorrent stuff',
+    regex: [
+      /\/torrent\-discovery\/package.json$/,
+      /\/webtorrent\/package.json$/,
+    ],
+    hack: function (file, contents) {
+      var pkg = JSON.parse(contents)
+      var browser = pkg.browser
+      var toDel = [
+        'bittorrent-dht',
+        'bittorrent-dht/client',
+        'bittorrent-tracker',
+        'bittorrent-tracker/client',
+        'bittorrent-swarm'
+      ]
+
+      var save
+      toDel.forEach(function (p) {
+        if (p in browser) {
+          delete browser[p]
+          save = true
+        }
+      })
+
+      if (save) {
+        return JSON.stringify(pkg, null, 2)
       }
     }
   },
