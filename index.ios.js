@@ -41,8 +41,6 @@ var ted = new Tim({
   port: 12345
 })
 
-ted.once('ready', console.log.bind(console, 'ready'))
-
 var {
   AppRegistry,
   StyleSheet,
@@ -51,20 +49,20 @@ var {
 } = React;
 
 var rnnode = React.createClass({
-  // componentWillMount: function () {
-  // }
+  getInitialState: function () {
+    return { ready: false }
+  },
+  componentWillMount: function () {
+    var self = this
+    ted.on('ready', function () {
+      self.setState({ ready: true })
+    })
+  },
   render: function() {
     return (
       <View style={styles.container}>
         <Text style={styles.welcome}>
-          Welcome to React Native!
-        </Text>
-        <Text style={styles.instructions}>
-          To get started, edit index.ios.js
-        </Text>
-        <Text style={styles.instructions}>
-          Press Cmd+R to reload,{'\n'}
-          Cmd+D or shake for dev menu
+          Ready: {String(this.state.ready)}
         </Text>
       </View>
     );

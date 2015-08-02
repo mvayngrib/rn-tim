@@ -129,6 +129,42 @@ var hackers = [
       }
     }
   },
+  {
+    name: 'depgraph (rn 0.6)',
+    regex: [
+      /react\-packager\/.*\/DependencyGraph\/index\.js/
+    ],
+    hack: function (file, contents) {
+      var evil = 'var id = sansExtJs(name);'
+      if (contents.indexOf(evil) !== -1) {
+        return contents.replace(evil, 'var id = name;')
+      }
+    }
+  },
+  {
+    name: 'ecurve',
+    regex: [
+      /ecurve\/lib\/names\.js/
+    ],
+    hack: function (file, contents) {
+      var evil = 'var curves = require(\'./curves\')'
+      if (contents.indexOf(evil) !== -1) {
+        return contents.replace(evil, 'var curves = require(\'./curves.json\')')
+      }
+    }
+  },
+  {
+    name: 'assert',
+    regex: [
+      /assert\/assert.js$/
+    ],
+    hack: function (file, contents) {
+      var evil = 'var util = require(\'util/\');'
+      if (contents.indexOf(evil) !== -1) {
+        return contents.replace(evil, 'var util = require(\'util\');')
+      }
+    }
+  },
   // {
   //   name: 'net',
   //   regex: [
@@ -151,70 +187,6 @@ var hackers = [
   //     }
   //   }
   // },
-  // {
-  //   name: 'fs',
-  //   regex: [
-  //     /bitkeeper-js\/package\.json$/,
-  //     /glob\/package\.json$/,
-  //     /random-access-file\/package\.json$/,
-  //     /chained-chat\/package\.json$/,
-  //     /pump\/package\.json$/,
-  //     /mime\/package\.json$/,
-  //     /walk\/package\.json$/,
-  //     /is-file\/package\.json$/,
-  //     /rimraf\/package\.json$/,
-  //     /webtorrent\/package\.json$/,
-  //     /formidable\/package\.json$/,
-  //     /mkdirp\/package\.json$/,
-  //     /load-ip-set\/package\.json$/,
-  //     /portfinder\/package\.json$/,
-  //     /tradle-utils\/package\.json$/,
-  //     /create-torrent\/package\.json$/,
-  //     /form-data\/package\.json$/,
-  //     /blockloader\/package\.json$/,
-  //     /chained-obj\/package\.json$/
-  //   ],
-  //   hack: function (file, contents) {
-  //     var pkg
-  //     try {
-  //       pkg = JSON.parse(contents)
-  //     } catch (err) {
-  //       console.log('failed to parse:', file)
-  //       return
-  //     }
-
-  //     rewireMain(pkg)
-  //     if (pkg.browser.fs !== 'react-native-level-fs') {
-  //       pkg.browser.fs = 'react-native-level-fs'
-  //       return JSON.stringify(pkg, null, 2)
-  //     }
-  //   }
-  // },
-  // {
-  //   name: 'dgram',
-  //   regex: [
-  //     /sock-plex\/package\.json$/,
-  //     /utp\/package\.json$/,
-  //     /bittorrent-dht\/package\.json$/,
-  //     /zlorp\/package\.json$/,
-  //     /dns\.js\/package\.json$/
-  //   ],
-  //   hack: function (file, contents) {
-  //     var pkg
-  //     try {
-  //       pkg = JSON.parse(contents)
-  //     } catch (err) {
-  //       console.log('failed to parse:', file)
-  //       return
-  //     }
-
-  //     rewireMain(pkg)
-  //     if (pkg.browser.dgram !== 'react-native-udp') {
-  //       pkg.browser.dgram = 'react-native-udp'
-  //       return JSON.stringify(pkg, null, 2)
-  //     }
-  //   }
-  // },
   {
     name: 'unzip-response',
     regex: [
@@ -230,23 +202,93 @@ var hackers = [
         hack + orig
       )
     }
+  },
+  {
+    name: 'rn-packager',
+    regex: [
+      /DependencyResolver\/Package\.js/
+    ],
+    hack: function (file, contents) {
+      var hack = body(function () {
+      /*
+        if (browser[name] === false) return false
+        if (!browser[name]) return name
+
+        // HACK!
+        name = browser[name]
+        if (name[0] === '.') {
+          return '.' + name
+        }
+
+        return name
+      */
+      })
+
+      var evil = 'return browser[name] || name'
+      if (contents.indexOf(evil) !== -1) {
+        return contents.replace(evil, hack)
+      }
+    }
+  },
+  {
+    name: 'crypto-browserify',
+    regex: [
+      /\/crypto-browserify\/rng\.js$/
+    ],
+    hack: function (file, contents) {
+      var hack = body(function () {
+        /*
+        // react-native-hack
+        try {
+          _crypto = (
+            g.crypto || g.msCrypto || require('crypto')
+          )
+        } catch (err) {
+          _crypto = {}
+        }
+        */
+      })
+
+      if (contents.indexOf('react-native-hack') !== -1) return
+
+      return contents.replace(/_crypto\s+=\s+\(\s+g\.crypto\s+\|\|\s+g.msCrypto\s+\|\|\s+require\('crypto'\)\s+\)/, hack)
+    }
   }
 ]
 
 function hackFiles () {
   var finder = find('./node_modules')
-  var movingOTR = fs.existsSync(raisedOtrPath)
+  var otrSrcPath
+  var movedOTR = fs.existsSync(raisedOtrPath)
+  var toRemove = []
 
   finder.on('directory', function (file) {
     file = path.resolve(file)
-    if (!/\/node_modules\/otr$/.test(file) || file === raisedOtrPath) {
-      return
+    if (/node_modules\/otr$/.test(file)) {
+      if (!otrSrcPath && /\/zlorp\/|\/tim\//.test(file)) {
+        otrSrcPath = file
+      } else {
+        if (file !== raisedOtrPath) {
+          return toRemove.push(file)
+        }
+      }
+    }
+  })
+
+  finder.on('end', function () {
+    if (!otrSrcPath && !movedOTR) {
+      throw new Error('no canonical otr installation found')
     }
 
-    if (movingOTR) return fs.remove(file, rethrow)
+    if (!movedOTR) {
+      console.log('moving', otrSrcPath, 'to', raisedOtrPath)
+      fs.move(otrSrcPath, raisedOtrPath, rethrow)
+    }
 
-    movingOTR = true
-    fs.move(file, raisedOtrPath, rethrow)
+    toRemove.forEach(function (file) {
+      console.log('removing', file)
+      fs.remove(file, rethrow)
+    })
   })
 
   finder.on('file', function (file) {
@@ -306,7 +348,7 @@ function hackFiles () {
 
 function rewireMain (pkg) {
   if (typeof pkg.browser === 'string') {
-    var main = pkg.browser
+    var main = pkg.browser || './index.js'
     pkg.browser = {}
     pkg.browser[pkg.main] = main
   }
@@ -333,6 +375,10 @@ function rewireMain (pkg) {
 
 function rethrow (err) {
   if (err) throw err
+}
+
+function body (fn) {
+  return fn.toString().split(/\n/).slice(2, -2).join('\n').trim()
 }
 
 hackFiles()
