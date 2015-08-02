@@ -12,30 +12,30 @@ var Identity = require('midentity').Identity
 var leveldown = require('asyncstorage-down')
 var Keeper = require('bitkeeper-js')
 var Wallet = require('simple-wallet')
+var Blockchain = require('cb-blockr')
 var help = require('tradle-test-helpers')
 // var fakeKeeper = help.fakeKeeper
 var fakeWallet = help.fakeWallet
 var DHT = require('bittorrent-dht')
-
-
 var networkName = 'testnet'
 var tedPub = require('./test/fixtures/ted-pub.json')
 var tedPriv = require('./test/fixtures/ted-priv.json')
 var tedIdent = Identity.fromJSON(tedPub)
-var tedWallet = walletFor(tedPriv, null, 'messaging')
+// var tedWallet = walletFor(tedPriv, null, 'messaging')
 var dht = dhtFor(tedIdent)
 var ted = new Tim({
   pathPrefix: 'ted',
   leveldown: leveldown,
   // syncInterval: 1000,
   networkName: networkName,
-  blockchain: tedWallet.blockchain,
+  // blockchain: tedWallet.blockchain,
+  blockchain: new Blockchain(networkName),
   dht: dht,
   keeper: new Keeper({
     dht: dht
   }),
   // keeper: fakeKeeper.empty(),
-  wallet: tedWallet,
+  // wallet: tedWallet,
   identity: tedIdent,
   identityKeys: tedPriv,
   port: 12345
